@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Strict Focus App</title>
-  <link href="https://fonts.googleapis.com/css2?family=Tan+Mon+Cheri&display=swap" rel="stylesheet">
   <style>
     body {
       margin: 0;
-      font-family: 'Tan Mon Cheri', sans-serif;
+      font-family: 'Engravers Gothic BT', 'Century Gothic', sans-serif;
       background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
       color: #fff;
       display: flex;
@@ -51,7 +50,7 @@
       margin: 16px;
       padding: 18px 36px;
       font-size: 1.3rem;
-      font-family: 'Tan Mon Cheri', sans-serif;
+      font-family: 'Engravers Gothic BT', 'Century Gothic', sans-serif;
       border: none;
       border-radius: 14px;
       transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
@@ -106,8 +105,15 @@
       background: linear-gradient(45deg, #3b82f6, #60a5fa);
     }
 
-    button.remove-button, #emergencyButton {
+    button.remove-button, #emergencyButton, button#startFocusButton {
       background: linear-gradient(45deg, #ef4444, #f87171);
+      margin-left: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+    }
+
+    button#viewHistoryButton {
+      background: linear-gradient(45deg, #3b82f6, #60a5fa);
       margin-left: 10px;
       padding: 10px 20px;
       font-size: 1rem;
@@ -193,6 +199,21 @@
       order: 2;
     }
 
+    #exitConfirmation div {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      flex-direction: row;
+    }
+
+    #exitConfirmation #cancelExitButton {
+      order: 1;
+    }
+
+    #exitConfirmation #confirmExitButton {
+      order: 2;
+    }
+
     #summary, #historyScreen, #exitConfirmation {
       background: #2a2a2a;
       padding: 32px;
@@ -239,7 +260,7 @@
       #warning { font-size: 1.3rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1.1rem; padding: 24px; }
       #historyList li { font-size: 1rem; }
-      button.remove-button, #emergencyButton { padding: 8px 16px; font-size: 0.9rem; }
+      button.remove-button, #emergencyButton, button#startFocusButton, button#viewHistoryButton { padding: 8px 16px; font-size: 0.9rem; }
     }
 
     @media (max-width: 400px) {
@@ -260,7 +281,7 @@
       #warning { font-size: 1.2rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1rem; padding: 20px; }
       #historyList li { font-size: 0.9rem; }
-      button.remove-button, #emergencyButton { padding: 6px 12px; font-size: 0.8rem; }
+      button.remove-button, #emergencyButton, button#startFocusButton, button#viewHistoryButton { padding: 6px 12px; font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -279,12 +300,14 @@
     <option value="default">Default Alarm</option>
     <option value="beep">Beep</option>
     <option value="chime">Chime</option>
+    <option value="custom">Custom</option>
   </select>
+  <input type="file" id="customAlarm" accept="audio/*" style="display: none;" />
   <div>
     <label><input type="checkbox" id="soundToggle" checked> Enable Sound</label>
   </div>
-  <button onclick="startFocus()">Start Focus</button>
-  <button onclick="showHistory()">View History</button>
+  <button id="startFocusButton" onclick="startFocus()">Start Focus</button>
+  <button id="viewHistoryButton" onclick="showHistory()">View History</button>
 
   <div id="lockScreen">
     <div id="overlay"></div>
@@ -307,9 +330,9 @@
     <p id="exitPrompt">Type the number shown below to end focus mode:</p>
     <p id="randomNumber"></p>
     <input type="text" id="exitInput" style="width: 160px;" />
-    <div style="display: flex; gap: 20px; margin-top: 20px;">
-      <button onclick="confirmExit()">Confirm</button>
-      <button onclick="cancelExit()">Cancel</button>
+    <div>
+      <button id="cancelExitButton" onclick="cancelExit()">Cancel</button>
+      <button id="confirmExitButton" onclick="confirmExit()">Confirm</button>
     </div>
   </div>
 
@@ -328,9 +351,10 @@
   <audio id="alarmDefault" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
   <audio id="alarmBeep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
   <audio id="alarmChime" src="https://actions.google.com/sounds/v1/alarms/chime.ogg" preload="auto"></audio>
+  <audio id="alarmCustom"></audio>
 
   <script>
-    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0, allowedApps = [], exitCode = '';
+    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0, allowedApps = [], exitCode = '', customAlarmFile = null;
 
     function startFocus() {
       const minutes = parseInt(document.getElementById("minutes").value);
@@ -362,8 +386,10 @@
       document.getElementById("customWarning").disabled = true;
       document.getElementById("allowedApps").disabled = true;
       document.getElementById("alarmSound").disabled = true;
-      document.querySelector("button[onclick='startFocus()']").disabled = true;
-      document.querySelector("button[onclick='showHistory()']").disabled = true;
+      document.getElementById("customAlarm").disabled = true;
+      document.getElementById("soundToggle").disabled = true;
+      document.querySelector("#startFocusButton").disabled = true;
+      document.querySelector("#viewHistoryButton").disabled = true;
       document.body.style.pointerEvents = "none";
       document.body.style.touchAction = "none";
       document.getElementById("lockScreen").style.pointerEvents = "none";
@@ -543,10 +569,10 @@
       document.getElementById("exitInput").value = "";
       document.getElementById("exitInput").style.pointerEvents = "auto";
       document.getElementById("exitInput").style.touchAction = "auto";
-      document.querySelector("#exitConfirmation button[onclick='confirmExit()']").style.pointerEvents = "auto";
-      document.querySelector("#exitConfirmation button[onclick='confirmExit()']").style.touchAction = "auto";
-      document.querySelector("#exitConfirmation button[onclick='cancelExit()']").style.pointerEvents = "auto";
-      document.querySelector("#exitConfirmation button[onclick='cancelExit()']").style.touchAction = "auto";
+      document.getElementById("confirmExitButton").style.pointerEvents = "auto";
+      document.getElementById("confirmExitButton").style.touchAction = "auto";
+      document.getElementById("cancelExitButton").style.pointerEvents = "auto";
+      document.getElementById("cancelExitButton").style.touchAction = "auto";
       console.log("Exit confirmation shown", { exitCode });
     }
 
@@ -574,8 +600,10 @@
         document.getElementById("customWarning").disabled = false;
         document.getElementById("allowedApps").disabled = false;
         document.getElementById("alarmSound").disabled = false;
-        document.querySelector("button[onclick='startFocus()']").disabled = false;
-        document.querySelector("button[onclick='showHistory()']").disabled = false;
+        document.getElementById("customAlarm").disabled = false;
+        document.getElementById("soundToggle").disabled = false;
+        document.querySelector("#startFocusButton").disabled = false;
+        document.querySelector("#viewHistoryButton").disabled = false;
         document.body.style.pointerEvents = "auto";
         document.body.style.touchAction = "auto";
         document.getElementById("lockScreen").style.pointerEvents = "none";
@@ -614,8 +642,14 @@
       if (!document.getElementById("soundToggle").checked) return;
       try {
         const sound = document.getElementById("alarmSound").value;
-        const audio = document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`);
-        audio.play().catch(() => console.log("Audio playback failed"));
+        if (sound === 'custom' && customAlarmFile) {
+          const audio = document.getElementById("alarmCustom");
+          audio.src = URL.createObjectURL(customAlarmFile);
+          audio.play().catch(() => console.log("Custom audio playback failed"));
+        } else {
+          const audio = document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`);
+          audio.play().catch(() => console.log("Audio playback failed"));
+        }
       } catch (error) {
         console.error("Error in playAlarm:", error);
       }
@@ -705,6 +739,20 @@
       }
     }
 
+    // Handle custom alarm file selection
+    document.getElementById("alarmSound").addEventListener("change", () => {
+      if (document.getElementById("alarmSound").value === 'custom') {
+        document.getElementById("customAlarm").click();
+      }
+    });
+
+    document.getElementById("customAlarm").addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        customAlarmFile = e.target.files[0];
+        console.log("Custom alarm file selected", { fileName: customAlarmFile.name });
+      }
+    });
+
     // Block all keyboard interactions
     document.addEventListener("keydown", (e) => {
       if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "cancelButton" && e.target.id !== "exitInput" && !e.target.closest("#exitConfirmation")) {
@@ -715,7 +763,7 @@
 
     // Block all mouse clicks except on allowed elements
     document.addEventListener("click", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "cancelButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "cancelButton" && e.target.id !== "confirmExitButton" && e.target.id !== "cancelExitButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
         e.preventDefault();
         handleUnauthorizedInteraction(e);
       }
@@ -723,7 +771,7 @@
 
     // Block all touch interactions except on allowed elements
     document.addEventListener("touchstart", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "cancelButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "cancelButton" && e.target.id !== "confirmExitButton" && e.target.id !== "cancelExitButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
         e.preventDefault();
         handleUnauthorizedInteraction(e);
       }
