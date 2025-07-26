@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Strict Focus App</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #1e1e1e, #2c3e50);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      transition: background 0.5s ease;
+      user-select: none;
+      touch-action: none; /* Prevent default touch actions like scrolling */
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    input, button {
+      margin: 12px;
+      padding: 14px 28px;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 10px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      pointer-events: auto;
+      min-width: 120px; /* Larger touch targets */
+      touch-action: auto; /* Allow touch on buttons */
+    }
+
+    input {
+      background: #ffffff22;
+      color: #fff;
+      width: 120px;
+      text-align: center;
+    }
+
+    button {
+      background: linear-gradient(45deg, #00b894, #00cec9);
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    button:disabled {
+      background: #636e72;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #lockScreen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #2d3436, #636e72);
+      color: white;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.5s ease-in;
+      touch-action: none;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 9998;
+      pointer-events: auto;
+      touch-action: auto;
+    }
+
+    #emergencyButton {
+      background: linear-gradient(45deg, #d63031, #e17055);
+      font-weight: bold;
+      pointer-events: auto;
+      touch-action: auto;
+      animation: pulseEmergency 2s infinite;
+    }
+
+    @keyframes pulseEmergency {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    #timerContainer {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 20px 0;
+      z-index: 10000;
+    }
+
+    #timer {
+      font-size: 2.8rem;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      z-index: 10001;
+    }
+
+    #progressRing {
+      transform: rotate(-90deg);
+    }
+
+    #progressRing circle {
+      stroke: #00b894;
+      stroke-dasharray: 565.48;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    #warning {
+      color: #ff7675;
+      font-weight: bold;
+      margin: 20px 0;
+      font-size: 1.3rem;
+      animation: pulse 1.5s infinite;
+      max-width: 90%;
+      z-index: 10000;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    #controls {
+      display: flex;
+      gap: 12px;
+      z-index: 10000;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 2rem; }
+      #timer { font-size: 2.2rem; }
+      input, button { 
+        font-size: 1rem; 
+        padding: 12px 24px; 
+        min-width: 100px;
+      }
+      #timerContainer { width: 160px; height: 160px; }
+      #warning { font-size: 1.1rem; }
+    }
+
+    @media (max-width: 400px) {
+      h1 { font-size: 1.8rem; }
+      #timer { font-size: 1.8rem; }
+      input, button { 
+        font-size: 0.9rem; 
+        padding: 10px 20px; 
+        min-width: 90px;
+      }
+      #timerContainer { width: 140px; height: 140px; }
+      #warning { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔒 Strict Focus Mode</h1>
+  <label for="minutes">Duration (minutes):</label>
+  <input type="number" id="minutes" value="25" min="1" max="180" />
+  <div>
+    <label><input type="checkbox" id="soundToggle" checked> Enable Sound</label>
+  </div>
+  <button onclick="startFocus()">Start Focus</button>
+
+  <div id="lockScreen">
+    <div id="overlay"></div>
+    <h2>🚫 Stay Focused!</h2>
+    <div id="timerContainer">
+      <svg id="progressRing" width="220" height="220">
+        <circle cx="110" cy="110" r="100" fill="none" stroke="#ffffff22" stroke-width="12" />
+        <circle cx="110" cy="110" r="100" fill="none" stroke-width="12" />
+      </svg>
+      <div id="timer">--:--</div>
+    </div>
+    <div id="warning"></div>
+    <div id="controls">
+      <button id="pauseButton" onclick="pauseFocus()">Pause</button>
+      <button id="continueButton" onclick="continueFocus()">Continue</button>
+      <button id="emergencyButton" onclick="confirmEndFocus()">Emergency Exit</button>
+    </div>
+  </div>
+
+  <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+  <script>
+    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false;
+
+    function startFocus() {
+      const minutes = parseInt(document.getElementById("minutes").value);
+      if (!minutes || minutes <= 0) {
+        alert("Enter a valid time");
+        return;
+      }
+
+      totalDuration = minutes * 60 * 1000;
+      endTime = Date.now() + totalDuration;
+      isPaused = false;
+      isFocusMode = true;
+      document.getElementById("lockScreen").style.display = "flex";
+      document.getElementById("warning").textContent = "";
+      document.getElementById("pauseButton").style.display = "inline-block";
+      document.getElementById("continueButton").style.display = "none";
+      document.getElementById("minutes").disabled = true;
+      document.querySelector("button[onclick='startFocus()']").disabled = true;
+      document.body.style.pointerEvents = "none";
+      document.body.style.touchAction = "none";
+      document.getElementById("lockScreen").style.pointerEvents = "none";
+      document.getElementById("lockScreen").style.touchAction = "none";
+      document.getElementById("pauseButton").style.pointerEvents = "auto";
+      document.getElementById("pauseButton").style.touchAction = "auto";
+      document.getElementById("continueButton").style.pointerEvents = "auto";
+      document.getElementById("continueButton").style.touchAction = "auto";
+      document.getElementById("emergencyButton").style.pointerEvents = "auto";
+      document.getElementById("emergencyButton").style.touchAction = "auto";
+      localStorage.setItem("lastDuration", minutes);
+      updateTimer();
+      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
+      interval = setInterval(updateTimer, 1000);
+      console.log("Focus mode started");
+    }
+
+    function updateTimer() {
+      if (isPaused) return;
+
+      const now = Date.now();
+      const remaining = endTime - now;
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        document.getElementById("timer").textContent = "✅ Time's Up!";
+        if (document.getElementById("soundToggle").checked) {
+          document.getElementById("alarm").play();
+        }
+        setTimeout(endFocus, 4000);
+        return;
+      }
+
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+      const progress = 565.48 * (remaining / totalDuration);
+      document.querySelector("#progressRing circle:last-child").style.strokeDashoffset = 565.48 - progress;
+    }
+
+    function pauseFocus() {
+      if (!isFocusMode) return;
+      isPaused = true;
+      document.getElementById("warning").textContent = "⏸️ Timer Paused";
+      document.getElementById("pauseButton").style.display = "none";
+      document.getElementById("continueButton").style.display = "inline-block";
+      console.log("Timer paused");
+    }
+
+    function continueFocus() {
+      if (!isFocusMode) return;
+      isPaused = false;
+      document.getElementById("warning").textContent = "";
+      document.getElementById("pauseButton").style.display = "inline-block";
+      document.getElementById("continueButton").style.display = "none";
+      console.log("Focus resumed");
+    }
+
+    function confirmEndFocus() {
+      if (!isFocusMode) return;
+      if (confirm("Are you sure you want to exit focus mode? This will end your session.")) {
+        endFocus();
+      }
+    }
+
+    function endFocus() {
+      clearInterval(interval);
+      document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
+      document.getElementById("lockScreen").style.display = "none";
+      document.getElementById("minutes").disabled = false;
+      document.querySelector("button[onclick='startFocus()']").disabled = false;
+      document.body.style.pointerEvents = "auto";
+      document.body.style.touchAction = "auto";
+      document.getElementById("lockScreen").style.pointerEvents = "none";
+      document.getElementById("lockScreen").style.touchAction = "none";
+      isPaused = false;
+      isFocusMode = false;
+      document.getElementById("timer").textContent = "--:--";
+      document.getElementById("pauseButton").style.display = "inline-block";
+      document.getElementById("continueButton").style.display = "none";
+      console.log("Focus mode ended");
+    }
+
+    function handleUnauthorizedInteraction() {
+      if (!isFocusMode || isPaused) return;
+      isPaused = true;
+      document.getElementById("warning").textContent = "⚠️ Unauthorized interaction detected! Focus mode is paused. Press Continue to resume.";
+      document.getElementById("pauseButton").style.display = "none";
+      document.getElementById("continueButton").style.display = "inline-block";
+      console.log("Unauthorized interaction detected");
+    }
+
+    // Block all keyboard interactions
+    document.addEventListener("keydown", (e) => {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton") {
+        e.preventDefault();
+        handleUnauthorizedInteraction();
+      }
+    });
+
+    // Block all mouse clicks except on allowed buttons
+    document.addEventListener("click", (e) => {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton") {
+        e.preventDefault();
+        handleUnauthorizedInteraction();
+      }
+    });
+
+    // Block all touch interactions except on allowed buttons
+    document.addEventListener("touchstart", (e) => {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton") {
+        e.preventDefault();
+        handleUnauthorizedInteraction();
+      }
+    });
+
+    // Detect tab switching
+    document.addEventListener("visibilitychange", () => {
+      if (isFocusMode && document.hidden) {
+        handleUnauthorizedInteraction();
+      }
+    });
+
+    // Prevent new tab/window shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (isFocusMode) {
+        if ((e.ctrlKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N')) ||
+            (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N'))) {
+          e.preventDefault();
+          handleUnauthorizedInteraction();
+        }
+      }
+    });
+
+    // Re-enter fullscreen if exited
+    document.addEventListener("fullscreenchange", () => {
+      if (isFocusMode && !document.fullscreenElement) {
+        handleUnauthorizedInteraction();
+        document.body.requestFullscreen().catch(() => console.log("Re-enter fullscreen failed"));
+      }
+    });
+
+    window.onload = () => {
+      const lastDuration = localStorage.getItem("lastDuration");
+      if (lastDuration) document.getElementById("minutes").value = lastDuration;
+      document.body.style.touchAction = "auto";
+      console.log("Page loaded");
+    };
+  </script>
+</body>
+</html>
