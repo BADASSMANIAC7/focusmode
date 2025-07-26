@@ -104,6 +104,13 @@
       background: linear-gradient(45deg, #3b82f6, #60a5fa);
     }
 
+    button.remove-button {
+      background: linear-gradient(45deg, #ef4444, #f87171);
+      margin-left: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+    }
+
     #lockScreen, #breakScreen, #historyScreen, #summary, #exitConfirmation {
       display: none;
       position: fixed;
@@ -211,6 +218,9 @@
       background: rgba(255, 255, 255, 0.08);
       border-radius: 10px;
       font-size: 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     @media (max-width: 600px) {
@@ -231,6 +241,7 @@
       #warning { font-size: 1.3rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1.1rem; padding: 24px; }
       #historyList li { font-size: 1rem; }
+      button.remove-button { padding: 8px 16px; font-size: 0.9rem; }
     }
 
     @media (max-width: 400px) {
@@ -251,6 +262,7 @@
       #warning { font-size: 1.2rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1rem; padding: 20px; }
       #historyList li { font-size: 0.9rem; }
+      button.remove-button { padding: 6px 12px; font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -323,9 +335,10 @@
 
     function startFocus() {
       const minutes = parseInt(document.getElementById("minutes").value);
-      const breakMinutes = parseInt(document.getElementById("breakMinutes").value);
-      if (!minutes || minutes <= 0 || !breakMinutes || breakMinutes <= 0) {
-        alert("Enter valid times for focus and break");
+      const breakMinutesInput = document.getElementById("breakMinutes").value;
+      const breakMinutes = parseInt(breakMinutesInput) || 5; // Fallback to 5 if invalid
+      if (!minutes || minutes <= 0) {
+        alert("Enter a valid focus duration");
         return;
       }
 
@@ -356,10 +369,10 @@
       document.body.style.touchAction = "none";
       document.getElementById("lockScreen").style.pointerEvents = "none";
       document.getElementById("lockScreen").style.touchAction = "none";
-      updateTimer();
       document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
+      updateTimer();
       interval = setInterval(updateTimer, 1000);
-      console.log("Focus mode started", { minutes, breakMinutes, endTime });
+      console.log("Focus mode started", { minutes, breakMinutes, totalDuration, endTime });
       if (navigator.vibrate) navigator.vibrate(100);
       lockOrientation();
     }
@@ -398,30 +411,36 @@
     function updateTimer() {
       if (isPaused) return;
 
-      const now = Date.now();
-      const remaining = endTime - now;
+      try {
+        const now = Date.now();
+        const remaining = endTime - now;
 
-      if (remaining <= 0) {
-        clearInterval(interval);
-        document.getElementById("timer").textContent = mode === 'focus' ? "✅ Time's Up!" : "🏁 Break Over!";
-        playAlarm();
-        if (mode === 'focus') {
-          setTimeout(showSummary, 4000);
-        } else {
-          setTimeout(endBreak, 4000);
+        if (remaining <= 0) {
+          clearInterval(interval);
+          document.getElementById("timer").textContent = mode === 'focus' ? "✅ Time's Up!" : "🏁 Break Over!";
+          playAlarm();
+          if (mode === 'focus') {
+            setTimeout(showSummary, 4000);
+          } else {
+            setTimeout(endBreak, 4000);
+          }
+          console.log(`Timer ended: ${mode}`);
+          return;
         }
-        return;
+
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        document.getElementById("timer").style.animation = "tick 1s";
+
+        setTimeout(() => {
+          document.getElementById("timer").style.animation = "";
+        }, 1000);
+        console.log(`Timer updated: ${mode}, remaining: ${remaining}ms, display: ${mins}:${secs}`);
+      } catch (error) {
+        console.error("Error in updateTimer:", error);
+        document.getElementById("timer").textContent = "Error";
       }
-
-      const mins = Math.floor(remaining / 60000);
-      const secs = Math.floor((remaining % 60000) / 1000);
-      document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      document.getElementById("timer").style.animation = "tick 1s";
-
-      setTimeout(() => {
-        document.getElementById("timer").style.animation = "";
-      }, 1000);
-      console.log(`Timer updated: ${mode}, remaining: ${remaining}ms`);
     }
 
     function pauseFocus() {
@@ -452,26 +471,35 @@
       isPaused = true;
       clearInterval(interval);
       focusRemaining = endTime - Date.now();
-      const breakMinutes = parseInt(document.getElementById("breakMinutes").value);
-      if (isNaN(breakMinutes) || breakMinutes <= 0) {
+      const breakMinutesInput = document.getElementById("breakMinutes").value;
+      const breakMinutes = parseInt(breakMinutesInput) || 5; // Fallback to 5 if invalid
+      if (breakMinutes <= 0) {
         alert("Please enter a valid break duration");
         isPaused = false;
         interval = setInterval(updateTimer, 1000);
         return;
       }
-      totalDuration = breakMinutes * 60 * 1000;
-      startTime = Date.now();
-      endTime = startTime + totalDuration;
-      isPaused = false;
-      mode = 'break';
-      document.getElementById("lockScreen").style.display = "none";
-      document.getElementById("breakScreen").style.display = "flex";
-      document.getElementById("warning").textContent = "";
-      updateControls();
-      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
-      updateTimer();
-      interval = setInterval(updateTimer, 1000);
-      console.log("Break mode started", { breakMinutes, totalDuration, endTime });
+      try {
+        totalDuration = breakMinutes * 60 * 1000;
+        startTime = Date.now();
+        endTime = startTime + totalDuration;
+        isPaused = false;
+        mode = 'break';
+        document.getElementById("lockScreen").style.display = "none";
+        document.getElementById("breakScreen").style.display = "flex";
+        document.getElementById("warning").textContent = "";
+        updateControls();
+        document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
+        updateTimer(); // Immediate update to avoid --:--
+        interval = setInterval(updateTimer, 1000);
+        console.log("Break mode started", { breakMinutes, totalDuration, endTime, focusRemaining });
+      } catch (error) {
+        console.error("Error in startBreak:", error);
+        alert("Failed to start break timer");
+        isPaused = false;
+        mode = 'focus';
+        interval = setInterval(updateTimer, 1000);
+      }
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -488,18 +516,23 @@
     }
 
     function endBreak() {
-      clearInterval(interval);
-      document.getElementById("breakScreen").style.display = "none";
-      mode = 'focus';
-      endTime = Date.now() + focusRemaining;
-      isPaused = false;
-      document.getElementById("lockScreen").style.display = "flex";
-      document.getElementById("warning").textContent = "";
-      updateControls();
-      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
-      updateTimer();
-      interval = setInterval(updateTimer, 1000);
-      console.log("Break mode ended, focus resumed", { focusRemaining, endTime });
+      try {
+        clearInterval(interval);
+        document.getElementById("breakScreen").style.display = "none";
+        mode = 'focus';
+        endTime = Date.now() + focusRemaining;
+        isPaused = false;
+        document.getElementById("lockScreen").style.display = "flex";
+        document.getElementById("warning").textContent = "";
+        updateControls();
+        document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
+        updateTimer();
+        interval = setInterval(updateTimer, 1000);
+        console.log("Break mode ended, focus resumed", { focusRemaining, endTime });
+      } catch (error) {
+        console.error("Error in endBreak:", error);
+        alert("Failed to resume focus timer");
+      }
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -511,7 +544,6 @@
       document.getElementById("exitInput").style.touchAction = "auto";
       document.querySelector("#exitConfirmation button[onclick='confirmExit()']").style.pointerEvents = "auto";
       document.querySelector("#exitConfirmation button[onclick='confirmExit()']").style.touchAction = "auto";
-      document.querySelector("#exitConfirmation button[onclick='cancelExit()']").style.pointerEvents = "auto";
       document.querySelector("#exitConfirmation button[onclick='cancelExit()']").style.touchAction = "auto";
     }
 
@@ -529,32 +561,36 @@
     }
 
     function endFocus() {
-      clearInterval(interval);
-      document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
-      document.getElementById("lockScreen").style.display = "none";
-      document.getElementById("breakScreen").style.display = "none";
-      document.getElementById("minutes").disabled = false;
-      document.getElementById("breakMinutes").disabled = false;
-      document.getElementById("customWarning").disabled = false;
-      document.getElementById("allowedApps").disabled = false;
-      document.getElementById("alarmSound").disabled = false;
-      document.querySelector("button[onclick='startFocus()']").disabled = false;
-      document.querySelector("button[onclick='showHistory()']").disabled = false;
-      document.body.style.pointerEvents = "auto";
-      document.body.style.touchAction = "auto";
-      document.getElementById("lockScreen").style.pointerEvents = "none";
-      document.getElementById("lockScreen").style.touchAction = "none";
-      document.getElementById("breakScreen").style.pointerEvents = "none";
-      document.getElementById("breakScreen").style.touchAction = "none";
-      isPaused = false;
-      isFocusMode = false;
-      mode = 'focus';
-      document.getElementById("timer").textContent = "--:--";
-      updateControls();
-      saveSession();
-      showSummary();
-      unlockOrientation();
-      console.log("Focus mode ended");
+      try {
+        clearInterval(interval);
+        document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
+        document.getElementById("lockScreen").style.display = "none";
+        document.getElementById("breakScreen").style.display = "none";
+        document.getElementById("minutes").disabled = false;
+        document.getElementById("breakMinutes").disabled = false;
+        document.getElementById("customWarning").disabled = false;
+        document.getElementById("allowedApps").disabled = false;
+        document.getElementById("alarmSound").disabled = false;
+        document.querySelector("button[onclick='startFocus()']").disabled = false;
+        document.querySelector("button[onclick='showHistory()']").disabled = false;
+        document.body.style.pointerEvents = "auto";
+        document.body.style.touchAction = "auto";
+        document.getElementById("lockScreen").style.pointerEvents = "none";
+        document.getElementById("lockScreen").style.touchAction = "none";
+        document.getElementById("breakScreen").style.pointerEvents = "none";
+        document.getElementById("breakScreen").style.touchAction = "none";
+        isPaused = false;
+        isFocusMode = false;
+        mode = 'focus';
+        document.getElementById("timer").textContent = "--:--";
+        updateControls();
+        saveSession();
+        showSummary();
+        unlockOrientation();
+        console.log("Focus mode ended");
+      } catch (error) {
+        console.error("Error in endFocus:", error);
+      }
     }
 
     function handleUnauthorizedInteraction(e) {
@@ -574,30 +610,42 @@
 
     function playAlarm() {
       if (!document.getElementById("soundToggle").checked) return;
-      const sound = document.getElementById("alarmSound").value;
-      const audio = document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`);
-      audio.play().catch(() => console.log("Audio playback failed"));
+      try {
+        const sound = document.getElementById("alarmSound").value;
+        const audio = document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`);
+        audio.play().catch(() => console.log("Audio playback failed"));
+      } catch (error) {
+        console.error("Error in playAlarm:", error);
+      }
     }
 
     function saveSession() {
-      const totalTime = (Date.now() - startTime) / 60000;
-      const session = {
-        date: new Date().toLocaleString(),
-        duration: totalTime.toFixed(1),
-        interruptions: interruptions,
-      };
-      let sessions = JSON.parse(localStorage.getItem("focusSessions") || "[]");
-      sessions.push(session);
-      localStorage.setItem("focusSessions", JSON.stringify(sessions));
+      try {
+        const totalTime = (Date.now() - startTime) / 60000;
+        const session = {
+          date: new Date().toLocaleString(),
+          duration: totalTime.toFixed(1),
+          interruptions: interruptions,
+        };
+        let sessions = JSON.parse(localStorage.getItem("focusSessions") || "[]");
+        sessions.push(session);
+        localStorage.setItem("focusSessions", JSON.stringify(sessions));
+      } catch (error) {
+        console.error("Error in saveSession:", error);
+      }
     }
 
     function showSummary() {
-      const totalTime = (Date.now() - startTime) / 60000;
-      const summaryText = `Session Duration: ${totalTime.toFixed(1)} minutes\nInterruptions: ${interruptions}`;
-      document.getElementById("summaryText").textContent = summaryText;
-      document.getElementById("summary").style.display = "block";
-      document.querySelector("#summary button[onclick='closeSummary()']").style.pointerEvents = "auto";
-      document.querySelector("#summary button[onclick='closeSummary()']").style.touchAction = "auto";
+      try {
+        const totalTime = (Date.now() - startTime) / 60000;
+        const summaryText = `Session Duration: ${totalTime.toFixed(1)} minutes\nInterruptions: ${interruptions}`;
+        document.getElementById("summaryText").textContent = summaryText;
+        document.getElementById("summary").style.display = "block";
+        document.querySelector("#summary button[onclick='closeSummary()']").style.pointerEvents = "auto";
+        document.querySelector("#summary button[onclick='closeSummary()']").style.touchAction = "auto";
+      } catch (error) {
+        console.error("Error in showSummary:", error);
+      }
     }
 
     function closeSummary() {
@@ -605,17 +653,38 @@
     }
 
     function showHistory() {
-      const sessions = JSON.parse(localStorage.getItem("focusSessions") || "[]");
-      const historyList = document.getElementById("historyList");
-      historyList.innerHTML = "";
-      sessions.forEach((session) => {
-        const li = document.createElement("li");
-        li.textContent = `Date: ${session.date}, Duration: ${session.duration} min, Interruptions: ${session.interruptions}`;
-        historyList.appendChild(li);
-      });
-      document.getElementById("historyScreen").style.display = "flex";
-      document.querySelector("#historyScreen button").style.pointerEvents = "auto";
-      document.querySelector("#historyScreen button").style.touchAction = "auto";
+      try {
+        const sessions = JSON.parse(localStorage.getItem("focusSessions") || "[]");
+        const historyList = document.getElementById("historyList");
+        historyList.innerHTML = "";
+        sessions.forEach((session, index) => {
+          const li = document.createElement("li");
+          li.innerHTML = `Date: ${session.date}, Duration: ${session.duration} min, Interruptions: ${session.interruptions}
+            <button class="remove-button" onclick="removeHistoryEntry(${index})">Remove</button>`;
+          historyList.appendChild(li);
+        });
+        document.getElementById("historyScreen").style.display = "flex";
+        document.querySelector("#historyScreen button[onclick='closeHistory()']").style.pointerEvents = "auto";
+        document.querySelector("#historyScreen button[onclick='closeHistory()']").style.touchAction = "auto";
+        historyList.querySelectorAll(".remove-button").forEach(btn => {
+          btn.style.pointerEvents = "auto";
+          btn.style.touchAction = "auto";
+        });
+      } catch (error) {
+        console.error("Error in showHistory:", error);
+      }
+    }
+
+    function removeHistoryEntry(index) {
+      try {
+        let sessions = JSON.parse(localStorage.getItem("focusSessions") || "[]");
+        sessions.splice(index, 1);
+        localStorage.setItem("focusSessions", JSON.stringify(sessions));
+        showHistory();
+        console.log(`Removed history entry at index ${index}`);
+      } catch (error) {
+        console.error("Error in removeHistoryEntry:", error);
+      }
     }
 
     function closeHistory() {
