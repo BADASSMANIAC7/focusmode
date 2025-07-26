@@ -106,7 +106,7 @@
       background: linear-gradient(45deg, #3b82f6, #60a5fa);
     }
 
-    button.remove-button {
+    button.remove-button, #emergencyButton {
       background: linear-gradient(45deg, #ef4444, #f87171);
       margin-left: 10px;
       padding: 10px 20px;
@@ -148,13 +148,13 @@
       margin: 32px 0;
       text-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
       z-index: 10001;
-      transition: transform 0.2s;
+      transition: transform 0.2s, opacity 0.2s;
     }
 
-    @keyframes tick {
-      0% { transform: scale(1) rotate(0deg); }
-      50% { transform: scale(1.08) rotate(5deg); }
-      100% { transform: scale(1) rotate(0deg); }
+    @keyframes popInOut {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
     }
 
     #warning {
@@ -181,6 +181,18 @@
       justify-content: center;
     }
 
+    #breakScreen #controls {
+      flex-direction: row;
+    }
+
+    #cancelButton {
+      order: 1;
+    }
+
+    #continueButton {
+      order: 2;
+    }
+
     #summary, #historyScreen, #exitConfirmation {
       background: #2a2a2a;
       padding: 32px;
@@ -202,6 +214,7 @@
       margin: 16px 0;
       padding: 16px;
       background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
       font-size: 1.2rem;
       display: flex;
       justify-content: space-between;
@@ -216,7 +229,7 @@
       label { font-size: 1.2rem; }
       input, button, select, textarea { 
         font-size: 1.1rem; 
-        padding: 14px 8px; 
+        padding: 14px 28px; 
         min-width: 140px;
       }
       input[type="number"], input[type="text"], textarea { width: 140px; }
@@ -226,7 +239,7 @@
       #warning { font-size: 1.3rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1.1rem; padding: 24px; }
       #historyList li { font-size: 1rem; }
-      button.remove-button { padding: 8px 16px; font-size: 0.9rem; }
+      button.remove-button, #emergencyButton { padding: 8px 16px; font-size: 0.9rem; }
     }
 
     @media (max-width: 400px) {
@@ -237,7 +250,7 @@
       label { font-size: 1.1rem; }
       input, button, select, textarea { 
         font-size: 1rem; 
-        padding: 12px 6px; 
+        padding: 12px 24px; 
         min-width: 120px;
       }
       input[type="number"], input[type="text"], textarea { width: 120px; }
@@ -247,7 +260,7 @@
       #warning { font-size: 1.2rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1rem; padding: 20px; }
       #historyList li { font-size: 0.9rem; }
-      button.remove-button { padding: 6px 12px; font-size: 0.8rem; }
+      button.remove-button, #emergencyButton { padding: 6px 12px; font-size: 0.8rem; }
     }
   </style>
 </head>
@@ -417,7 +430,7 @@
         const mins = Math.floor(remaining / 60000);
         const secs = Math.floor((remaining % 60000) / 1000);
         document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        document.getElementById("timer").style.animation = "tick 1s";
+        document.getElementById("timer").style.animation = "popInOut 1s";
 
         setTimeout(() => {
           document.getElementById("timer").style.animation = "";
@@ -524,7 +537,7 @@
 
     function showExitConfirmation() {
       if (!isFocusMode) return;
-      exitCode = Math.floor(1000 + Math.random() * 9000).toString();
+      exitCode = Math.floor(Math.random() * 10).toString();
       document.getElementById("randomNumber").textContent = exitCode;
       document.getElementById("exitConfirmation").style.display = "block";
       document.getElementById("exitInput").value = "";
@@ -659,8 +672,8 @@
           btn.style.pointerEvents = "auto";
           btn.style.touchAction = "auto";
         });
-      } catch (e) {
-        console.error("Error in showHistory:", e);
+      } catch (error) {
+        console.error("Error in showHistory:", error);
       }
     }
 
@@ -671,8 +684,8 @@
         localStorage.setItem("focusSessions", JSON.stringify(sessions));
         showHistory();
         console.log(`Removed history entry at index ${index}`);
-      } catch (e) {
-        console.error("Error removing history entry:", e);
+      } catch (error) {
+        console.error("Error in removeHistoryEntry:", error);
       }
     }
 
@@ -744,8 +757,8 @@
         if (savedAllowedApps) document.getElementById("allowedApps").value = JSON.parse(savedAllowedApps).join('\n');
         document.body.style.touchAction = "auto";
         console.log("Page loaded");
-      } catch (e) {
-        console.error("Error on page load:", e);
+      } catch (error) {
+        console.error("Error on page load:", error);
       }
     };
   </script>
