@@ -18,7 +18,7 @@
       text-align: center;
       transition: background 0.5s ease;
       user-select: none;
-      touch-action: none; /* Prevent default touch actions like scrolling */
+      touch-action: auto;
     }
 
     h1 {
@@ -35,8 +35,8 @@
       border-radius: 10px;
       transition: transform 0.2s, box-shadow 0.2s;
       pointer-events: auto;
-      min-width: 120px; /* Larger touch targets */
-      touch-action: auto; /* Allow touch on buttons */
+      min-width: 120px;
+      touch-action: auto;
     }
 
     input {
@@ -129,6 +129,13 @@
       font-weight: bold;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       z-index: 10001;
+      transition: transform 0.2s;
+    }
+
+    @keyframes tick {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
+      100% { transform: translate(-50%, -50%) scale(1); }
     }
 
     #progressRing {
@@ -137,7 +144,7 @@
 
     #progressRing circle {
       stroke: #00b894;
-      stroke-dasharray: 565.48;
+      stroke-dasharray: 628.32;
       stroke-dashoffset: 0;
       transition: stroke-dashoffset 1s linear;
     }
@@ -166,6 +173,25 @@
       justify-content: center;
     }
 
+    #summary {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #2d3436;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      z-index: 10002;
+      text-align: center;
+      max-width: 90%;
+    }
+
+    #summary button {
+      margin-top: 15px;
+    }
+
     @media (max-width: 600px) {
       h1 { font-size: 2rem; }
       #timer { font-size: 2.2rem; }
@@ -176,6 +202,7 @@
       }
       #timerContainer { width: 160px; height: 160px; }
       #warning { font-size: 1.1rem; }
+      #summary { font-size: 1rem; }
     }
 
     @media (max-width: 400px) {
@@ -188,6 +215,7 @@
       }
       #timerContainer { width: 140px; height: 140px; }
       #warning { font-size: 1rem; }
+      #summary { font-size: 0.9rem; }
     }
   </style>
 </head>
@@ -218,10 +246,16 @@
     </div>
   </div>
 
+  <div id="summary">
+    <h3>Focus Session Summary</h3>
+    <p id="summaryText"></p>
+    <button onclick="closeSummary()">Close</button>
+  </div>
+
   <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
   <script>
-    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false;
+    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime;
 
     function startFocus() {
       const minutes = parseInt(document.getElementById("minutes").value);
@@ -231,9 +265,11 @@
       }
 
       totalDuration = minutes * 60 * 1000;
-      endTime = Date.now() + totalDuration;
+      startTime = Date.now();
+      endTime = startTime + totalDuration;
       isPaused = false;
       isFocusMode = true;
+      interruptions = 0;
       document.getElementById("lockScreen").style.display = "flex";
       document.getElementById("warning").textContent = "";
       document.getElementById("pauseButton").style.display = "inline-block";
@@ -255,6 +291,7 @@
       document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       interval = setInterval(updateTimer, 1000);
       console.log("Focus mode started");
+      if (navigator.vibrate) navigator.vibrate(100);
     }
 
     function updateTimer() {
@@ -276,27 +313,39 @@
       const mins = Math.floor(remaining / 60000);
       const secs = Math.floor((remaining % 60000) / 1000);
       document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      document.getElementById("timer").style.animation = "tick 1s";
 
-      const progress = 565.48 * (remaining / totalDuration);
-      document.querySelector("#progressRing circle:last-child").style.strokeDashoffset = 565.48 - progress;
+      const progress = 628.32 * (remaining / totalDuration);
+      document.querySelector("#progressRing circle:last-child").style.strokeDashoffset = 628.32 - progress;
+
+      setTimeout(() => {
+        document.getElementById("timer").style.animation = "";
+      }, 1000);
     }
 
     function pauseFocus() {
       if (!isFocusMode) return;
       isPaused = true;
+      clearInterval(interval);
+      pauseStartTime = Date.now();
       document.getElementById("warning").textContent = "⏸️ Timer Paused";
       document.getElementById("pauseButton").style.display = "none";
       document.getElementById("continueButton").style.display = "inline-block";
       console.log("Timer paused");
+      if (navigator.vibrate) navigator.vibrate(100);
     }
 
     function continueFocus() {
       if (!isFocusMode) return;
       isPaused = false;
+      const pauseDuration = Date.now() - pauseStartTime;
+      endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
       document.getElementById("pauseButton").style.display = "inline-block";
       document.getElementById("continueButton").style.display = "none";
+      interval = setInterval(updateTimer, 1000);
       console.log("Focus resumed");
+      if (navigator.vibrate) navigator.vibrate(100);
     }
 
     function confirmEndFocus() {
@@ -321,16 +370,32 @@
       document.getElementById("timer").textContent = "--:--";
       document.getElementById("pauseButton").style.display = "inline-block";
       document.getElementById("continueButton").style.display = "none";
+      showSummary();
       console.log("Focus mode ended");
     }
 
     function handleUnauthorizedInteraction() {
       if (!isFocusMode || isPaused) return;
       isPaused = true;
+      interruptions++;
+      clearInterval(interval);
+      pauseStartTime = Date.now();
       document.getElementById("warning").textContent = "⚠️ Unauthorized interaction detected! Focus mode is paused. Press Continue to resume.";
       document.getElementById("pauseButton").style.display = "none";
       document.getElementById("continueButton").style.display = "inline-block";
       console.log("Unauthorized interaction detected");
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+
+    function showSummary() {
+      const totalTime = (Date.now() - startTime) / 60000;
+      const summaryText = `Session Duration: ${totalTime.toFixed(1)} minutes\nInterruptions: ${interruptions}`;
+      document.getElementById("summaryText").textContent = summaryText;
+      document.getElementById("summary").style.display = "block";
+    }
+
+    function closeSummary() {
+      document.getElementById("summary").style.display = "none";
     }
 
     // Block all keyboard interactions
@@ -343,7 +408,7 @@
 
     // Block all mouse clicks except on allowed buttons
     document.addEventListener("click", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton") {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "summaryButton") {
         e.preventDefault();
         handleUnauthorizedInteraction();
       }
@@ -351,7 +416,7 @@
 
     // Block all touch interactions except on allowed buttons
     document.addEventListener("touchstart", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton") {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "summaryButton") {
         e.preventDefault();
         handleUnauthorizedInteraction();
       }
@@ -368,7 +433,7 @@
     document.addEventListener("keydown", (e) => {
       if (isFocusMode) {
         if ((e.ctrlKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N')) ||
-            (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N'))) {
+            (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'N'))) {
           e.preventDefault();
           handleUnauthorizedInteraction();
         }
