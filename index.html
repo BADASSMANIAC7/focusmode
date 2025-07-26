@@ -46,7 +46,7 @@
       margin: 8px 0;
     }
 
-    input, button, select {
+    input, button, select, textarea {
       margin: 16px;
       padding: 18px 36px;
       font-size: 1.3rem;
@@ -58,15 +58,20 @@
       touch-action: auto;
     }
 
-    input[type="number"], input[type="text"] {
+    input[type="number"], input[type="text"], textarea {
       background: rgba(255, 255, 255, 0.12);
       color: #fff;
       text-align: center;
       width: 160px;
     }
 
-    input[type="text"]#customWarning {
+    input[type="text"]#customWarning, textarea#allowedApps {
       width: 240px;
+    }
+
+    textarea#allowedApps {
+      height: 80px;
+      resize: none;
     }
 
     select {
@@ -93,6 +98,10 @@
       cursor: not-allowed;
       transform: none;
       box-shadow: none;
+    }
+
+    button.app-button {
+      background: linear-gradient(45deg, #3b82f6, #60a5fa);
     }
 
     #lockScreen, #breakScreen, #historyScreen, #summary, #exitConfirmation {
@@ -210,13 +219,14 @@
       h3 { font-size: 1.6rem; }
       #timer { font-size: 3.5rem; }
       label { font-size: 1.2rem; }
-      input, button, select { 
+      input, button, select, textarea { 
         font-size: 1.1rem; 
         padding: 14px 28px; 
         min-width: 140px;
       }
-      input[type="number"], input[type="text"] { width: 140px; }
-      input[type="text"]#customWarning { width: 200px; }
+      input[type="number"], input[type="text"], textarea { width: 140px; }
+      input[type="text"]#customWarning, textarea#allowedApps { width: 200px; }
+      textarea#allowedApps { height: 60px; }
       select { width: 180px; }
       #warning { font-size: 1.3rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1.1rem; padding: 24px; }
@@ -229,13 +239,14 @@
       h3 { font-size: 1.4rem; }
       #timer { font-size: 3rem; }
       label { font-size: 1.1rem; }
-      input, button, select { 
+      input, button, select, textarea { 
         font-size: 1rem; 
         padding: 12px 24px; 
         min-width: 120px;
       }
-      input[type="number"], input[type="text"] { width: 120px; }
-      input[type="text"]#customWarning { width: 180px; }
+      input[type="number"], input[type="text"], textarea { width: 120px; }
+      input[type="text"]#customWarning, textarea#allowedApps { width: 180px; }
+      textarea#allowedApps { height: 50px; }
       select { width: 160px; }
       #warning { font-size: 1.2rem; }
       #summary, #historyScreen, #exitConfirmation { font-size: 1rem; padding: 20px; }
@@ -251,6 +262,8 @@
   <input type="number" id="breakMinutes" value="5" min="1" max="60" />
   <label for="customWarning">Custom Warning Message:</label>
   <input type="text" id="customWarning" placeholder="Stay focused!" maxlength="100" />
+  <label for="allowedApps">Allowed Apps (one URL per line, e.g., https://www.google.com/keep):</label>
+  <textarea id="allowedApps" placeholder="Enter app URLs, one per line"></textarea>
   <label for="alarmSound">Alarm Sound:</label>
   <select id="alarmSound">
     <option value="default">Default Alarm</option>
@@ -268,12 +281,7 @@
     <h2>🚫 Stay Focused!</h2>
     <div id="timer">--:--</div>
     <div id="warning"></div>
-    <div id="controls">
-      <button id="pauseButton" onclick="pauseFocus()">Pause</button>
-      <button id="continueButton" onclick="continueFocus()">Continue</button>
-      <button id="breakButton" onclick="startBreak()">Take Break</button>
-      <button id="emergencyButton" onclick="showExitConfirmation()">Emergency Exit</button>
-    </div>
+    <div id="controls"></div>
   </div>
 
   <div id="breakScreen">
@@ -281,10 +289,7 @@
     <h2>☕ Break Time!</h2>
     <div id="timer">--:--</div>
     <div id="warning"></div>
-    <div id="controls">
-      <button id="continueButton" onclick="continueBreak()">Continue</button>
-      <button id="skipBreakButton" onclick="endBreak()">Skip Break</button>
-    </div>
+    <div id="controls"></div>
   </div>
 
   <div id="exitConfirmation">
@@ -314,7 +319,7 @@
   <audio id="alarmChime" src="https://actions.google.com/sounds/v1/alarms/chime.ogg" preload="auto"></audio>
 
   <script>
-    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0;
+    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0, allowedApps = [];
 
     function startFocus() {
       const minutes = parseInt(document.getElementById("minutes").value);
@@ -323,6 +328,11 @@
         alert("Enter valid times for focus and break");
         return;
       }
+
+      // Load allowed apps
+      const allowedAppsInput = document.getElementById("allowedApps").value.trim();
+      allowedApps = allowedAppsInput ? allowedAppsInput.split('\n').map(url => url.trim()).filter(url => url) : [];
+      localStorage.setItem("allowedApps", JSON.stringify(allowedApps));
 
       totalDuration = minutes * 60 * 1000;
       startTime = Date.now();
@@ -334,12 +344,11 @@
       document.getElementById("lockScreen").style.display = "flex";
       document.getElementById("breakScreen").style.display = "none";
       document.getElementById("warning").textContent = "";
-      document.getElementById("pauseButton").style.display = "inline-block";
-      document.getElementById("continueButton").style.display = "none";
-      document.getElementById("breakButton").style.display = "inline-block";
+      updateControls();
       document.getElementById("minutes").disabled = true;
       document.getElementById("breakMinutes").disabled = true;
       document.getElementById("customWarning").disabled = true;
+      document.getElementById("allowedApps").disabled = true;
       document.getElementById("alarmSound").disabled = true;
       document.querySelector("button[onclick='startFocus()']").disabled = true;
       document.querySelector("button[onclick='showHistory()']").disabled = true;
@@ -347,22 +356,43 @@
       document.body.style.touchAction = "none";
       document.getElementById("lockScreen").style.pointerEvents = "none";
       document.getElementById("lockScreen").style.touchAction = "none";
-      document.getElementById("pauseButton").style.pointerEvents = "auto";
-      document.getElementById("pauseButton").style.touchAction = "auto";
-      document.getElementById("continueButton").style.pointerEvents = "auto";
-      document.getElementById("continueButton").style.touchAction = "auto";
-      document.getElementById("breakButton").style.pointerEvents = "auto";
-      document.getElementById("breakButton").style.touchAction = "auto";
-      document.getElementById("emergencyButton").style.pointerEvents = "auto";
-      document.getElementById("emergencyButton").style.touchAction = "auto";
-      localStorage.setItem("lastDuration", minutes);
-      localStorage.setItem("lastBreakDuration", breakMinutes);
       updateTimer();
       document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       interval = setInterval(updateTimer, 1000);
-      console.log("Focus mode started");
+      console.log("Focus mode started", { minutes, breakMinutes, endTime });
       if (navigator.vibrate) navigator.vibrate(100);
       lockOrientation();
+    }
+
+    function updateControls() {
+      const controls = document.querySelector(`#${mode === 'focus' ? 'lockScreen' : 'breakScreen'} #controls`);
+      controls.innerHTML = '';
+      if (mode === 'focus') {
+        controls.innerHTML += `
+          <button id="pauseButton" onclick="pauseFocus()" style="display: ${isPaused ? 'none' : 'inline-block'}">Pause</button>
+          <button id="continueButton" onclick="continueFocus()" style="display: ${isPaused ? 'inline-block' : 'none'}">Continue</button>
+          <button id="breakButton" onclick="startBreak()" style="display: ${isPaused ? 'none' : 'inline-block'}">Take Break</button>
+          <button id="emergencyButton" onclick="showExitConfirmation()">Emergency Exit</button>
+        `;
+      } else {
+        controls.innerHTML += `
+          <button id="continueButton" onclick="continueBreak()" style="display: ${isPaused ? 'inline-block' : 'none'}">Continue</button>
+          <button id="skipBreakButton" onclick="endBreak()" style="display: ${isPaused ? 'none' : 'inline-block'}">Skip Break</button>
+        `;
+      }
+      allowedApps.forEach((url, index) => {
+        const button = document.createElement('button');
+        button.className = 'app-button';
+        button.textContent = `Open App ${index + 1}`;
+        button.onclick = () => window.open(url, '_blank');
+        button.style.pointerEvents = 'auto';
+        button.style.touchAction = 'auto';
+        controls.appendChild(button);
+      });
+      controls.querySelectorAll('button').forEach(btn => {
+        btn.style.pointerEvents = 'auto';
+        btn.style.touchAction = 'auto';
+      });
     }
 
     function updateTimer() {
@@ -391,6 +421,7 @@
       setTimeout(() => {
         document.getElementById("timer").style.animation = "";
       }, 1000);
+      console.log(`Timer updated: ${mode}, remaining: ${remaining}ms`);
     }
 
     function pauseFocus() {
@@ -399,9 +430,7 @@
       clearInterval(interval);
       pauseStartTime = Date.now();
       document.getElementById("warning").textContent = "⏸️ Focus Paused";
-      document.getElementById("pauseButton").style.display = "none";
-      document.getElementById("breakButton").style.display = "none";
-      document.getElementById("continueButton").style.display = "inline-block";
+      updateControls();
       console.log("Focus paused");
       if (navigator.vibrate) navigator.vibrate(100);
     }
@@ -412,11 +441,9 @@
       const pauseDuration = Date.now() - pauseStartTime;
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
-      document.getElementById("pauseButton").style.display = "inline-block";
-      document.getElementById("breakButton").style.display = "inline-block";
-      document.getElementById("continueButton").style.display = "none";
+      updateControls();
       interval = setInterval(updateTimer, 1000);
-      console.log("Focus resumed");
+      console.log("Focus resumed", { endTime });
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -426,8 +453,10 @@
       clearInterval(interval);
       focusRemaining = endTime - Date.now();
       const breakMinutes = parseInt(document.getElementById("breakMinutes").value);
-      if (!breakMinutes || breakMinutes <= 0) {
-        alert("Invalid break duration");
+      if (isNaN(breakMinutes) || breakMinutes <= 0) {
+        alert("Please enter a valid break duration");
+        isPaused = false;
+        interval = setInterval(updateTimer, 1000);
         return;
       }
       totalDuration = breakMinutes * 60 * 1000;
@@ -438,14 +467,11 @@
       document.getElementById("lockScreen").style.display = "none";
       document.getElementById("breakScreen").style.display = "flex";
       document.getElementById("warning").textContent = "";
-      document.getElementById("continueButton").style.display = "none";
-      document.getElementById("skipBreakButton").style.display = "inline-block";
-      document.getElementById("skipBreakButton").style.pointerEvents = "auto";
-      document.getElementById("skipBreakButton").style.touchAction = "auto";
+      updateControls();
       document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       updateTimer();
       interval = setInterval(updateTimer, 1000);
-      console.log("Break mode started");
+      console.log("Break mode started", { breakMinutes, totalDuration, endTime });
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -455,10 +481,9 @@
       const pauseDuration = Date.now() - pauseStartTime;
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
-      document.getElementById("continueButton").style.display = "none";
-      document.getElementById("skipBreakButton").style.display = "inline-block";
+      updateControls();
       interval = setInterval(updateTimer, 1000);
-      console.log("Break resumed");
+      console.log("Break resumed", { endTime });
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -470,13 +495,11 @@
       isPaused = false;
       document.getElementById("lockScreen").style.display = "flex";
       document.getElementById("warning").textContent = "";
-      document.getElementById("pauseButton").style.display = "inline-block";
-      document.getElementById("breakButton").style.display = "inline-block";
-      document.getElementById("continueButton").style.display = "none";
+      updateControls();
       document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       updateTimer();
       interval = setInterval(updateTimer, 1000);
-      console.log("Break mode ended, focus resumed");
+      console.log("Break mode ended, focus resumed", { focusRemaining, endTime });
       if (navigator.vibrate) navigator.vibrate(100);
     }
 
@@ -513,6 +536,7 @@
       document.getElementById("minutes").disabled = false;
       document.getElementById("breakMinutes").disabled = false;
       document.getElementById("customWarning").disabled = false;
+      document.getElementById("allowedApps").disabled = false;
       document.getElementById("alarmSound").disabled = false;
       document.querySelector("button[onclick='startFocus()']").disabled = false;
       document.querySelector("button[onclick='showHistory()']").disabled = false;
@@ -526,31 +550,24 @@
       isFocusMode = false;
       mode = 'focus';
       document.getElementById("timer").textContent = "--:--";
-      document.getElementById("pauseButton").style.display = "inline-block";
-      document.getElementById("continueButton").style.display = "none";
-      document.getElementById("breakButton").style.display = "inline-block";
+      updateControls();
       saveSession();
       showSummary();
       unlockOrientation();
       console.log("Focus mode ended");
     }
 
-    function handleUnauthorizedInteraction() {
+    function handleUnauthorizedInteraction(e) {
       if (!isFocusMode || isPaused) return;
+      // Allow clicks on app buttons
+      if (e.target.classList.contains('app-button')) return;
       isPaused = true;
       interruptions++;
       clearInterval(interval);
       pauseStartTime = Date.now();
       const customMsg = document.getElementById("customWarning").value.trim() || "Stay focused!";
       document.getElementById("warning").textContent = `⚠️ Unauthorized interaction detected! ${customMsg} Press Continue to resume.`;
-      if (mode === 'focus') {
-        document.getElementById("pauseButton").style.display = "none";
-        document.getElementById("breakButton").style.display = "none";
-        document.getElementById("continueButton").style.display = "inline-block";
-      } else {
-        document.getElementById("skipBreakButton").style.display = "none";
-        document.getElementById("continueButton").style.display = "inline-block";
-      }
+      updateControls();
       console.log("Unauthorized interaction detected");
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
@@ -621,30 +638,30 @@
     document.addEventListener("keydown", (e) => {
       if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "skipBreakButton" && e.target.id !== "exitInput" && !e.target.closest("#exitConfirmation")) {
         e.preventDefault();
-        handleUnauthorizedInteraction();
+        handleUnauthorizedInteraction(e);
       }
     });
 
     // Block all mouse clicks except on allowed elements
     document.addEventListener("click", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "skipBreakButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen")) {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "skipBreakButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
         e.preventDefault();
-        handleUnauthorizedInteraction();
+        handleUnauthorizedInteraction(e);
       }
     });
 
     // Block all touch interactions except on allowed elements
     document.addEventListener("touchstart", (e) => {
-      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "skipBreakButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen")) {
+      if (isFocusMode && e.target.id !== "emergencyButton" && e.target.id !== "pauseButton" && e.target.id !== "continueButton" && e.target.id !== "breakButton" && e.target.id !== "skipBreakButton" && !e.target.closest("#exitConfirmation") && !e.target.closest("#summary") && !e.target.closest("#historyScreen") && !e.target.classList.contains('app-button')) {
         e.preventDefault();
-        handleUnauthorizedInteraction();
+        handleUnauthorizedInteraction(e);
       }
     });
 
     // Detect tab switching
     document.addEventListener("visibilitychange", () => {
       if (isFocusMode && document.hidden) {
-        handleUnauthorizedInteraction();
+        handleUnauthorizedInteraction({});
       }
     });
 
@@ -654,7 +671,7 @@
         if ((e.ctrlKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N')) ||
             (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N'))) {
           e.preventDefault();
-          handleUnauthorizedInteraction();
+          handleUnauthorizedInteraction(e);
         }
       }
     });
@@ -662,8 +679,10 @@
     window.onload = () => {
       const lastDuration = localStorage.getItem("lastDuration");
       const lastBreakDuration = localStorage.getItem("lastBreakDuration");
+      const savedAllowedApps = localStorage.getItem("allowedApps");
       if (lastDuration) document.getElementById("minutes").value = lastDuration;
       if (lastBreakDuration) document.getElementById("breakMinutes").value = lastBreakDuration;
+      if (savedAllowedApps) document.getElementById("allowedApps").value = JSON.parse(savedAllowedApps).join('\n');
       document.body.style.touchAction = "auto";
       console.log("Page loaded");
     };
