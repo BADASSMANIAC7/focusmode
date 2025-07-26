@@ -7,7 +7,7 @@
   <style>
     body {
       margin: 0;
-      font-family: 'Engravers Gothic BT', 'Century Gothic', sans-serif;
+      font-family: Arial, sans-serif;
       background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
       color: #fff;
       display: flex;
@@ -50,7 +50,7 @@
       margin: 16px;
       padding: 18px 36px;
       font-size: 1.3rem;
-      font-family: 'Engravers Gothic BT', 'Century Gothic', sans-serif;
+      font-family: Arial, sans-serif;
       border: none;
       border-radius: 14px;
       transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
@@ -137,46 +137,47 @@
     }
 
     #overlay {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.7);
       z-index: 9998;
-      pointer-events: auto;
-      touch-action: auto;
+      pointer-events: "auto";
+      touch-action: "auto";
     }
 
     #timer {
       font-size: 4.5rem;
       font-weight: 400;
-      margin: 32px 0;
-      text-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+      margin: 32px;
+      text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
       z-index: 10001;
-      transition: transform 0.2s, opacity 0.2s;
+      transition: transform 0.1s, opacity 0.1s;
     }
 
     @keyframes popInOut {
       0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.1); opacity: 0.7; }
+      50% { transform: scale(1.2); opacity: 0.6; }
       100% { transform: scale(1); opacity: 1; }
     }
 
     #warning {
-      color: #f87171;
+      font-family: 'Engravers Gothic BT', 'Century Gothic', sans-serif;
+      color: #f4f4f6;
       font-weight: 400;
       margin: 32px 0;
       font-size: 1.5rem;
-      animation: pulse 1.5s infinite;
+      animation: slideIn 0.5s ease-out;
       max-width: 90%;
+      text-align: center;
       z-index: 10000;
     }
 
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.08); }
-      100% { transform: scale(1); }
+    @keyframes slideIn {
+      0% { transform: translateY(-20px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
     }
 
     #controls {
@@ -191,11 +192,11 @@
       flex-direction: row;
     }
 
-    #cancelButton {
+    #breakScreen #cancelButton {
       order: 1;
     }
 
-    #continueButton {
+    #breakScreen #continueButton {
       order: 2;
     }
 
@@ -443,6 +444,7 @@
         if (remaining <= 0) {
           clearInterval(interval);
           document.getElementById("timer").textContent = mode === 'focus' ? "✅ Time's Up!" : "🏁 Break Over!";
+          document.getElementById("timer").style.animation = "";
           playAlarm();
           if (mode === 'focus') {
             setTimeout(showSummary, 4000);
@@ -456,11 +458,10 @@
         const mins = Math.floor(remaining / 60000);
         const secs = Math.floor((remaining % 60000) / 1000);
         document.getElementById("timer").textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        document.getElementById("timer").style.animation = "popInOut 1s";
-
-        setTimeout(() => {
-          document.getElementById("timer").style.animation = "";
-        }, 1000);
+        // Force animation reset for every second
+        document.getElementById("timer").style.animation = "none";
+        void document.getElementById("timer").offsetWidth; // Trigger reflow
+        document.getElementById("timer").style.animation = "popInOut 1s ease-in-out";
         console.log(`Timer updated: ${mode}, remaining: ${remaining}ms, display: ${mins}:${secs}`);
       } catch (error) {
         console.error("Error in updateTimer:", error);
@@ -474,6 +475,7 @@
       clearInterval(interval);
       pauseStartTime = Date.now();
       document.getElementById("warning").textContent = "⏸️ Focus Paused";
+      document.getElementById("timer").style.animation = "";
       updateControls();
       console.log("Focus paused");
       if (navigator.vibrate) navigator.vibrate(100);
@@ -486,6 +488,7 @@
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
       updateControls();
+      updateTimer();
       interval = setInterval(updateTimer, 1000);
       console.log("Focus resumed", { endTime });
       if (navigator.vibrate) navigator.vibrate(100);
@@ -498,7 +501,7 @@
       focusRemaining = endTime - Date.now();
       const breakMinutesInput = document.getElementById("breakMinutes").value;
       const breakMinutes = parseInt(breakMinutesInput) || 5;
-      if (breakMinutes <= 0) {
+      if (isNaN(breakMinutes) || breakMinutes <= 0) {
         alert("Please enter a valid break duration");
         isPaused = false;
         interval = setInterval(updateTimer, 1000);
@@ -535,6 +538,7 @@
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
       updateControls();
+      updateTimer();
       interval = setInterval(updateTimer, 1000);
       console.log("Break resumed", { endTime });
       if (navigator.vibrate) navigator.vibrate(100);
@@ -614,6 +618,7 @@
         isFocusMode = false;
         mode = 'focus';
         document.getElementById("timer").textContent = "--:--";
+        document.getElementById("timer").style.animation = "";
         updateControls();
         saveSession();
         showSummary();
@@ -633,6 +638,7 @@
       pauseStartTime = Date.now();
       const customMsg = document.getElementById("customWarning").value.trim() || "Stay focused!";
       document.getElementById("warning").textContent = `⚠️ Unauthorized interaction detected! ${customMsg} Press Cancel to resume.`;
+      document.getElementById("timer").style.animation = "";
       updateControls();
       console.log("Unauthorized interaction detected");
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -703,8 +709,8 @@
         document.querySelector("#historyScreen button[onclick='closeHistory()']").style.pointerEvents = "auto";
         document.querySelector("#historyScreen button[onclick='closeHistory()']").style.touchAction = "auto";
         historyList.querySelectorAll(".remove-button").forEach(btn => {
-          btn.style.pointerEvents = "auto";
-          btn.style.touchAction = "auto";
+          btn.style.pointerEvents = 'auto';
+          btn.style.touchAction = 'auto';
         });
       } catch (error) {
         console.error("Error in showHistory:", error);
@@ -788,7 +794,7 @@
     document.addEventListener("keydown", (e) => {
       if (isFocusMode) {
         if ((e.ctrlKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N')) ||
-            (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N'))) {
+            (e.metaKey && (e.key === 't' || e.key === 'T' || e.key === 'N'))) {
           e.preventDefault();
           handleUnauthorizedInteraction(e);
         }
