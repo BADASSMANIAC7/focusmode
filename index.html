@@ -358,7 +358,6 @@
       localStorage.setItem("lastDuration", minutes);
       localStorage.setItem("lastBreakDuration", breakMinutes);
       updateTimer();
-      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       interval = setInterval(updateTimer, 1000);
       console.log("Focus mode started");
       if (navigator.vibrate) navigator.vibrate(100);
@@ -375,7 +374,11 @@
         clearInterval(interval);
         document.getElementById("timer").textContent = mode === 'focus' ? "✅ Time's Up!" : "🏁 Break Over!";
         playAlarm();
-        setTimeout(mode === 'focus' ? showSummary : endBreak, 4000);
+        if (mode === 'focus') {
+          setTimeout(showSummary, 4000);
+        } else {
+          setTimeout(endBreak, 4000);
+        }
         return;
       }
 
@@ -396,6 +399,7 @@
       pauseStartTime = Date.now();
       document.getElementById("warning").textContent = "⏸️ Focus Paused";
       document.getElementById("pauseButton").style.display = "none";
+      document.getElementById("breakButton").style.display = "none";
       document.getElementById("continueButton").style.display = "inline-block";
       console.log("Focus paused");
       if (navigator.vibrate) navigator.vibrate(100);
@@ -408,6 +412,7 @@
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
       document.getElementById("pauseButton").style.display = "inline-block";
+      document.getElementById("breakButton").style.display = "inline-block";
       document.getElementById("continueButton").style.display = "none";
       interval = setInterval(updateTimer, 1000);
       console.log("Focus resumed");
@@ -458,8 +463,8 @@
       document.getElementById("lockScreen").style.display = "flex";
       document.getElementById("warning").textContent = "";
       document.getElementById("pauseButton").style.display = "inline-block";
-      document.getElementById("continueButton").style.display = "none";
       document.getElementById("breakButton").style.display = "inline-block";
+      document.getElementById("continueButton").style.display = "none";
       updateTimer();
       interval = setInterval(updateTimer, 1000);
       console.log("Break mode ended, focus resumed");
@@ -493,7 +498,6 @@
 
     function endFocus() {
       clearInterval(interval);
-      document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
       document.getElementById("lockScreen").style.display = "none";
       document.getElementById("breakScreen").style.display = "none";
       document.getElementById("minutes").disabled = false;
