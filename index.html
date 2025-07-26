@@ -358,6 +358,7 @@
       localStorage.setItem("lastDuration", minutes);
       localStorage.setItem("lastBreakDuration", breakMinutes);
       updateTimer();
+      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       interval = setInterval(updateTimer, 1000);
       console.log("Focus mode started");
       if (navigator.vibrate) navigator.vibrate(100);
@@ -425,6 +426,10 @@
       clearInterval(interval);
       focusRemaining = endTime - Date.now();
       const breakMinutes = parseInt(document.getElementById("breakMinutes").value);
+      if (!breakMinutes || breakMinutes <= 0) {
+        alert("Invalid break duration");
+        return;
+      }
       totalDuration = breakMinutes * 60 * 1000;
       startTime = Date.now();
       endTime = startTime + totalDuration;
@@ -434,8 +439,10 @@
       document.getElementById("breakScreen").style.display = "flex";
       document.getElementById("warning").textContent = "";
       document.getElementById("continueButton").style.display = "none";
+      document.getElementById("skipBreakButton").style.display = "inline-block";
       document.getElementById("skipBreakButton").style.pointerEvents = "auto";
       document.getElementById("skipBreakButton").style.touchAction = "auto";
+      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       updateTimer();
       interval = setInterval(updateTimer, 1000);
       console.log("Break mode started");
@@ -449,6 +456,7 @@
       endTime += pauseDuration;
       document.getElementById("warning").textContent = "";
       document.getElementById("continueButton").style.display = "none";
+      document.getElementById("skipBreakButton").style.display = "inline-block";
       interval = setInterval(updateTimer, 1000);
       console.log("Break resumed");
       if (navigator.vibrate) navigator.vibrate(100);
@@ -465,6 +473,7 @@
       document.getElementById("pauseButton").style.display = "inline-block";
       document.getElementById("breakButton").style.display = "inline-block";
       document.getElementById("continueButton").style.display = "none";
+      document.body.requestFullscreen().catch(() => console.log("Fullscreen request failed"));
       updateTimer();
       interval = setInterval(updateTimer, 1000);
       console.log("Break mode ended, focus resumed");
@@ -498,6 +507,7 @@
 
     function endFocus() {
       clearInterval(interval);
+      document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
       document.getElementById("lockScreen").style.display = "none";
       document.getElementById("breakScreen").style.display = "none";
       document.getElementById("minutes").disabled = false;
@@ -548,7 +558,8 @@
     function playAlarm() {
       if (!document.getElementById("soundToggle").checked) return;
       const sound = document.getElementById("alarmSound").value;
-      document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`).play();
+      const audio = document.getElementById(`alarm${sound.charAt(0).toUpperCase() + sound.slice(1)}`);
+      audio.play().catch(() => console.log("Audio playback failed"));
     }
 
     function saveSession() {
