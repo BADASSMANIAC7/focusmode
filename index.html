@@ -355,15 +355,28 @@
   <audio id="alarmCustom"></audio>
 
   <script>
-    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0, allowedApps = [], exitCode = '', customAlarmFile = null;
+    let endTime, interval, totalDuration, isPaused = false, isFocusMode = false, pauseStartTime, interruptions = 0, startTime, mode = 'focus', focusRemaining = 0, allowedApps = [], exitCode = '', customAlarmFile = null, wakeLock = null;
 
-    function startFocus() {
+    async function startFocus() {
       const minutes = parseInt(document.getElementById("minutes").value);
       const breakMinutesInput = document.getElementById("breakMinutes").value;
       const breakMinutes = parseInt(breakMinutesInput) || 5;
       if (!minutes || minutes <= 0) {
         alert("Enter a valid focus duration");
         return;
+      }
+
+      // Request screen wake lock
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log("Screen wake lock acquired");
+        } else {
+          console.warn("Screen Wake Lock API not supported in this browser");
+          alert("Your browser does not support keeping the screen awake. Please adjust your device’s screen timeout settings.");
+        }
+      } catch (err) {
+        console.error("Error acquiring wake lock:", err);
       }
 
       // Load allowed apps
@@ -593,7 +606,7 @@
       document.getElementById("exitConfirmation").style.display = "none";
     }
 
-    function endFocus() {
+    async function endFocus() {
       try {
         clearInterval(interval);
         document.exitFullscreen().catch(() => console.log("Exit fullscreen failed"));
@@ -623,7 +636,13 @@
         saveSession();
         showSummary();
         unlockOrientation();
-        console.log("Focus mode ended");
+
+        // Release wake lock
+        if (wakeLock !== null) {
+          await wakeLock.release();
+          wakeLock = null;
+          console.log("Screen wake lock released");
+        }
       } catch (error) {
         console.error("Error in endFocus:", error);
       }
